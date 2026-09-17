@@ -1,0 +1,10 @@
+*.csv
+*.pcap
+*.pyc
+__pycache__/
+WhatsMinerTool-9.2.5/
+transcript
+symbols.txt
+proxy.py
+whatsminer_peek.py
+whatsminer_test*.py
