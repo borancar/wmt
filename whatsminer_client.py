@@ -425,6 +425,79 @@ def compact(ip: str = typer.Argument("10.50.3.95", help="Miner IP address")):
     console.print(table)
 
 
+def _get_summary_dict(ip: str, sid: str | None = None) -> dict | None:
+    """Extract SUMMARY section from compact info."""
+    text = get_compact_info(ip, sid)
+    if not text:
+        return None
+    parts = text.split("#")
+    main_data = parts[5] if len(parts) > 5 else ""
+    sections = main_data.split("|")
+    summary = {}
+    if sections:
+        for item in sections[0].split(","):
+            if "=" in item:
+                k, _, v = item.partition("=")
+                k = k.strip()
+                if k and k != "SUMMARY":
+                    summary[k] = v.strip()
+    return summary
+
+
+@app.command()
+def summary(ip: str = typer.Argument("10.50.3.95", help="Miner IP address")):
+    """Show mining summary (hashrate, power, temps)."""
+    console.print(f"[bold]Querying {ip}...[/bold]")
+    sid = get_session_id(ip)
+    if not sid:
+        console.print("[red]Auth failed[/red]")
+        raise typer.Exit(1)
+
+    data = _get_summary_dict(ip, sid)
+    if not data:
+        console.print("[red]Query failed[/red]")
+        raise typer.Exit(1)
+
+    table = Table(title=f"Summary @ {ip}", show_lines=True)
+    table.add_column("Metric", style="cyan")
+    table.add_column("Value")
+
+    # Hashrate
+    hs_rt = int(data.get("HS RT", 0))
+    mhs_av = int(data.get("MHS av", 0))
+    mhs_15m = int(data.get("MHS 15m", 0))
+    table.add_row("Hashrate RT", f"{hs_rt / 1_000_000:.1f} MH/s ({hs_rt / 1_000_000_000:.2f} GH/s)")
+    table.add_row("Hashrate Avg", f"{mhs_av / 1_000_000:.1f} MH/s ({mhs_av / 1_000_000_000:.2f} GH/s)")
+    table.add_row("Hashrate 15m", f"{mhs_15m / 1_000_000:.1f} MH/s ({mhs_15m / 1_000_000_000:.2f} GH/s)")
+    table.add_row("Freq Avg", f"{data.get('freq_avg', '?')} MHz")
+    table.add_row("Hash Stable", data.get("Hash Stable", "?"))
+
+    # Power
+    table.add_row("Power", f"{data.get('Power', '?')} W")
+    table.add_row("Power Rate", f"{data.get('Power Rate', '?')} J/TH")
+    table.add_row("Power Limit", f"{data.get('Power Limit', '?')} W")
+    table.add_row("Power Mode", data.get("Power Mode", "?"))
+
+    # Temps
+    table.add_row("Chip Temp Min", f"{data.get('Chip Temp Min', '?')} C")
+    table.add_row("Chip Temp Max", f"{data.get('Chip Temp Max', '?')} C")
+    table.add_row("Chip Temp Avg", f"{data.get('Chip Temp Avg', '?')} C")
+
+    # Pool
+    table.add_row("Pool Rejected%", data.get("Pool Rejected%", "?"))
+
+    # Uptime
+    uptime = int(data.get("Uptime", 0))
+    elapsed = int(data.get("Elapsed", 0))
+    table.add_row("Uptime", f"{uptime // 3600}h {(uptime % 3600) // 60}m")
+    table.add_row("Elapsed", f"{elapsed // 3600}h {(elapsed % 3600) // 60}m")
+
+    # Errors
+    table.add_row("Error Count", data.get("Error Code Count", "0"))
+
+    console.print(table)
+
+
 @app.command()
 def hashrate(ip: str = typer.Argument("10.50.3.95", help="Miner IP address")):
     """Show hashrate information."""
