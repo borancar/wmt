@@ -31,9 +31,15 @@ DEFAULT_PORT = 8889
 
 
 def _build_auth_message(ip, account, password, version):
-    """Build 64-byte auth message (no 5A5A7F7F frame, Key1).
+    """Build 64-byte auth message (5A5A7F7F frame, Key1, cmdcode 0x00).
 
-    Format: random_nonce(16) + AES256-ECB("ip|ts|account|password|version" padded)
+    Frame layout (encrypted as AES-256-ECB with Key1):
+      +0x00 magic    = 0x7F7F5A5A
+      +0x04 cmdcode  = 0x00 (auth)
+      +0x08 len1     = payload length
+      +0x0a len2     = 0
+      +0x0c checksum = CRC32(payload) ^ 0xFFFFFFFF
+      +0x10 payload  = "ip|ts|account|password|version" + zero padding
     Server responds with 24-byte ack containing session_id.
     """
     ts = int(time.time())
@@ -41,9 +47,20 @@ def _build_auth_message(ip, account, password, version):
     pb = payload.encode("ascii")
     pad_len = (16 - len(pb) % 16) % 16
     padded = pb + b"\x00" * pad_len
-    nonce = os.urandom(16)
+    crc = binascii.crc32(pb) ^ 0xFFFFFFFF
+
+    hdr = struct.pack("<I", 0x7F7F5A5A)
+    hdr += struct.pack("<I", 0x00)
+    hdr += struct.pack("<H", len(pb))
+    hdr += struct.pack("<H", 0)
+    hdr += struct.pack("<I", crc)
+
+    frame = hdr + padded
+    while len(frame) < 64:
+        frame += b"\x00"
+
     cipher = AES.new(KEY_AUTH, AES.MODE_ECB)
-    return cipher.encrypt(nonce + padded)
+    return cipher.encrypt(frame)
 
 
 def _build_query_message(ip, account, password, version, session_id, cmdcode=0x16, param=""):
@@ -120,11 +137,11 @@ def get_session_id(ip, port=DEFAULT_PORT, account=ACCOUNT, password=PASSWORD, ve
         resp = _recv_all(sock, timeout=3.0)
         sock.close()
         # Response is 24 bytes: 16-byte header + 8-byte payload
-        # Payload bytes 4-7 contain the session_id (4-byte hex string)
+        # Payload bytes 4-7 contain the session_id as 4 raw bytes (hex-encoded for use)
         if len(resp) >= 24:
             payload = resp[16:24]
             if len(payload) >= 8:
-                return payload[4:8].decode("ascii", errors="ignore")
+                return payload[4:8].hex()
     except Exception:
         sock.close()
     return None
