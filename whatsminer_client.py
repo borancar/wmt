@@ -617,6 +617,9 @@ def set_pools_cmd(
     pool2: str = typer.Option("", "--pool2", help="Pool 2 URL"),
     worker2: str = typer.Option("", "--worker2", help="Pool 2 worker"),
     password2: str = typer.Option("", "--password2", help="Pool 2 password"),
+    pool3: str = typer.Option("", "--pool3", help="Pool 3 URL"),
+    worker3: str = typer.Option("", "--worker3", help="Pool 3 worker"),
+    password3: str = typer.Option("", "--password3", help="Pool 3 password"),
 ):
     """Configure mining pools."""
     pools = []
@@ -624,6 +627,8 @@ def set_pools_cmd(
         pools.append({"url": pool1, "worker": worker1, "password": password1})
     if pool2:
         pools.append({"url": pool2, "worker": worker2, "password": password2})
+    if pool3:
+        pools.append({"url": pool3, "worker": worker3, "password": password3})
     if not pools:
         console.print("[red]At least one pool required (--pool1)[/red]")
         raise typer.Exit(1)
