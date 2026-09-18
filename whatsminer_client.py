@@ -195,6 +195,16 @@ def get_compact_info(ip: str, session_id: str | None = None) -> str | None:
     return query_cmd_text(ip, 0x13, session_id)
 
 
+def get_hashrate(ip: str, session_id: str | None = None) -> str | None:
+    """Query detected hashrate (cmdcode 0x0F). Returns colon-separated values."""
+    return query_cmd_text(ip, 0x0F, session_id)
+
+
+def get_power_realtime(ip: str, session_id: str | None = None) -> str | None:
+    """Query power realtime info (cmdcode 0x1A)."""
+    return query_cmd_text(ip, 0x1A, session_id)
+
+
 def send_remote_control(ip: str, param: str,
                         session_id: str | None = None) -> bool:
     """Send remote control command (cmdcode 0x0D, param N=V)."""
@@ -544,6 +554,37 @@ def hashrate(ip: str = typer.Argument("10.50.3.95", help="Miner IP address")):
     temps = "_".join(power.get(f"BoardTemp{i}", "") for i in range(4))
     table.add_row("Board Temps", temps)
     table.add_row("Env Temp", power.get("EnvTemp", ""))
+
+    console.print(table)
+
+
+@app.command()
+def power(ip: str = typer.Argument("10.50.3.95", help="Miner IP address")):
+    """Show power supply realtime info (cmdcode 0x1A)."""
+    console.print(f"[bold]Querying {ip}...[/bold]")
+    sid = get_session_id(ip)
+    if not sid:
+        console.print("[red]Auth failed[/red]")
+        raise typer.Exit(1)
+
+    text = get_power_realtime(ip, sid)
+    if not text:
+        console.print("[red]Query failed[/red]")
+        raise typer.Exit(1)
+
+    table = Table(title=f"Power @ {ip}", show_lines=True)
+    table.add_column("Field", style="cyan")
+    table.add_column("Value")
+
+    for line in text.strip().split("\n"):
+        line = line.strip()
+        if line.startswith("[") and line.endswith("]"):
+            continue
+        if line.startswith("#"):
+            continue
+        if "=" in line:
+            k, _, v = line.partition("=")
+            table.add_row(k.strip(), v.strip())
 
     console.print(table)
 
