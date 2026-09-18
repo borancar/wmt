@@ -10,7 +10,6 @@ Session: auth via Key1 (cmdcode 0) → session_id, then queries via Key2 (cmdcod
 import socket
 import struct
 import time
-import os
 import binascii
 from Crypto.Cipher import AES
 
