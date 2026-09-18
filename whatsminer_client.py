@@ -356,45 +356,71 @@ def compact(ip: str = typer.Argument("10.50.3.95", help="Miner IP address")):
         console.print("[red]Query failed[/red]")
         raise typer.Exit(1)
 
-    # Parse the compact format: model-info#MAC#perms#SUMMARY,...|EDEVS,...|#Power,...
+    # Structure: model#MAC##perms#users#SUMMARY|EDEVS|POOLS|#Power
     parts = text.split("#")
+
+    # ── Model info ──
     table = Table(title=f"Compact Info @ {ip}", show_lines=True)
     table.add_column("Section", style="cyan")
     table.add_column("Value")
 
-    # Split model string: WhatsMiner-Type-Board-BoardVer-HashBoard-Power-Firmware-HashRate-Coin-SN
     if parts:
-        model_parts = parts[0].strip().split("-")
+        mp = parts[0].strip().split("-")
         labels = ["Brand", "Miner Type", "Control Board", "Board Version",
                    "Hash Board", "Power Type", "Firmware", "Detected HashRate",
                    "Coin Type"]
         for i, label in enumerate(labels):
-            if i < len(model_parts) and model_parts[i]:
-                table.add_row(label, model_parts[i])
-        # SN is after "MinerSn = " in the last part
-        if len(model_parts) > len(labels):
-            sn = "-".join(model_parts[len(labels):])
+            if i < len(mp) and mp[i]:
+                table.add_row(label, mp[i])
+        if len(mp) > len(labels):
+            sn = "-".join(mp[len(labels):])
             if "MinerSn" in sn:
                 sn = sn.split("=")[-1].strip()
             table.add_row("Miner SN", sn)
     if len(parts) > 1:
         table.add_row("MAC", parts[1].strip())
 
-    # Parse SUMMARY section
-    for part in parts:
-        if "SUMMARY" in part:
-            for item in part.split(","):
-                if "=" in item:
-                    k, _, v = item.partition("=")
-                    table.add_row(k.strip(), v.strip())
+    # ── Main data (pipe-separated: SUMMARY|EDEVS|POOLS|Power) ──
+    main_data = parts[5] if len(parts) > 5 else ""
+    sections = main_data.split("|")
 
-    # Parse Power section
-    for part in parts:
-        if "Uptime=" in part:
-            for item in part.replace("#", "").split(","):
-                if "=" in item:
-                    k, _, v = item.partition("=")
-                    table.add_row(f"Power.{k.strip()}", v.strip())
+    # SUMMARY
+    if sections:
+        for item in sections[0].split(","):
+            if "=" in item:
+                k, _, v = item.partition("=")
+                k = k.strip()
+                if k and k != "SUMMARY":
+                    table.add_row(k, v.strip())
+
+    # EDEVS (per-board)
+    for s in sections:
+        if s.startswith("ASC="):
+            fields = dict(item.split("=", 1) for item in s.split(",") if "=" in item)
+            slot = fields.get("Slot", "?")
+            mhs = int(fields.get("MHS av", 0)) / 1_000_000
+            freq = fields.get("Chip Frequency", "?")
+            chips = fields.get("Effective Chips", "?")
+            table.add_row(f"Board {slot}", f"{mhs:.1f} MH/s, {freq} MHz, {chips} chips")
+
+    # POOLS
+    for s in sections:
+        if s.startswith("POOL="):
+            fields = dict(item.split("=", 1) for item in s.split(",") if "=" in item)
+            pool_id = fields.get("POOL", "?")
+            url = fields.get("URL", "")
+            user = fields.get("User", "")
+            active = fields.get("Stratum Active", "")
+            table.add_row(f"Pool {pool_id}", f"{url} / {user} (active={active})")
+
+    # Power section (last # part)
+    power_data = parts[-1] if len(parts) > 5 else ""
+    for item in power_data.split(","):
+        if "=" in item:
+            k, _, v = item.partition("=")
+            k = k.strip()
+            if k and k != "Uptime":
+                table.add_row(f"Power.{k}", v.strip())
 
     console.print(table)
 
