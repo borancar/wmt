@@ -362,8 +362,21 @@ def compact(ip: str = typer.Argument("10.3.1.128", help="Miner IP address")):
     table.add_column("Section", style="cyan")
     table.add_column("Value")
 
+    # Split model string: WhatsMiner-Type-Board-BoardVer-HashBoard-Power-Firmware-HashRate-Coin-SN
     if parts:
-        table.add_row("Model", parts[0].strip())
+        model_parts = parts[0].strip().split("-")
+        labels = ["Brand", "Miner Type", "Control Board", "Board Version",
+                   "Hash Board", "Power Type", "Firmware", "Detected HashRate",
+                   "Coin Type"]
+        for i, label in enumerate(labels):
+            if i < len(model_parts) and model_parts[i]:
+                table.add_row(label, model_parts[i])
+        # SN is after "MinerSn = " in the last part
+        if len(model_parts) > len(labels):
+            sn = "-".join(model_parts[len(labels):])
+            if "MinerSn" in sn:
+                sn = sn.split("=")[-1].strip()
+            table.add_row("Miner SN", sn)
     if len(parts) > 1:
         table.add_row("MAC", parts[1].strip())
 
