@@ -78,8 +78,10 @@ def _build_query_message(ip: str, account: str, password: str, version: str,
     hdr += struct.pack("<I", crc)
 
     frame = hdr + full
-    while len(frame) < 80:
-        frame += b"\x00"
+    # Pad to next 16-byte boundary (minimum 80 bytes)
+    min_len = max(80, len(frame))
+    pad_len = (16 - min_len % 16) % 16
+    frame += b"\x00" * (min_len - len(frame) + pad_len)
 
     return AES.new(KEY_QUERY, AES.MODE_ECB).encrypt(frame)
 
