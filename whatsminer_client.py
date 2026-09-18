@@ -123,7 +123,11 @@ def _parse_header(data: bytes) -> dict | None:
 # ── Public API ──────────────────────────────────────────────────────
 
 def get_session_id(ip: str, port: int = DEFAULT_PORT) -> str | None:
-    """Auth handshake → returns hex session_id."""
+    """Auth handshake → returns hex session_id.
+
+    NOTE: Each auth invalidates the previous session_id.
+    Avoid calling this repeatedly — rapid re-auths may reset miner state.
+    """
     msg = _build_auth_message(ip, ACCOUNT, PASSWORD, TOOL_VERSION)
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.settimeout(5.0)
