@@ -31,6 +31,12 @@ KEY_QUERY = bytes.fromhex(
     "24a0e460fb970474a7539a48e787c296"
 )
 
+# Cmdcodes that modify miner state — never send these with empty/guessed params
+WRITE_CMDCODES = {0x02, 0x06, 0x0D}
+
+# Known safe read-only cmdcodes
+READ_CMDCODES = {0x11, 0x13, 0x16}
+
 ACCOUNT = "super"
 PASSWORD = "super"
 TOOL_VERSION = "9.2.5.0721"
@@ -660,8 +666,13 @@ def set_coin_cmd(
 @app.command()
 def raw(ip: str = typer.Argument("10.50.3.95", help="Miner IP address"),
         cmdcode: int = typer.Option(0x16, "--cmd", "-c", help="Command code (hex)"),
-        param: str = typer.Option("", "--param", "-p", help="Parameter (N=V format)")):
+        param: str = typer.Option("", "--param", "-p", help="Parameter (N=V format)"),
+        force: bool = typer.Option(False, "--force", "-f", help="Allow write cmdcodes")):
     """Send raw command and show response."""
+    if cmdcode in WRITE_CMDCODES and not force:
+        console.print(f"[red]cmdcode 0x{cmdcode:02X} is a WRITE command that modifies miner state.[/red]")
+        console.print(f"[red]Use --force to confirm. Known write cmdcodes: {[f'0x{x:02X}' for x in WRITE_CMDCODES]}[/red]")
+        raise typer.Exit(1)
     console.print(f"[bold]Sending cmd=0x{cmdcode:02X} to {ip}...[/bold]")
     sid = get_session_id(ip)
     if not sid:
