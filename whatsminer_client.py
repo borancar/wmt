@@ -345,21 +345,21 @@ def info(ip: str = typer.Argument("10.50.3.95", help="Miner IP address")):
     table.add_column("Field", style="cyan")
     table.add_column("Value")
 
-    table.add_row("Miner Type", f"{raw.get('MinerType', '')}_{raw.get('HashBoardVersion', '')}")
-    table.add_row("Firmware", raw.get("FirmwareVersion", ""))
-    table.add_row("Control Board", f"{raw.get('ControlBoardType', '')}-{raw.get('ControlBoardVersion', '')}")
-    table.add_row("Miner SN", raw.get("MinerSn", ""))
-    table.add_row("Power Type", raw.get("PowerType", ""))
-    table.add_row("Power SN", raw.get("PowerSerialNo", ""))
-    table.add_row("Coin Type", raw.get("CoinType", ""))
-    table.add_row("Detected HashRate", raw.get("DetectedHashRate", ""))
-    table.add_row("Board Num", raw.get("BoardNum", ""))
-    table.add_row("Power Mode", summary.get("Power Mode", ""))
-    table.add_row("Elapsed", summary.get("Elapsed", ""))
-    table.add_row("Uptime", power.get("Uptime", ""))
-    table.add_row("Env Temp", power.get("EnvTemp", ""))
-    table.add_row("Power", summary.get("Power", ""))
-    table.add_row("Error Count", summary.get("Error Code Count", ""))
+    # All raw MinerInfo fields
+    for k, v in raw.items():
+        table.add_row(k, v)
+
+    # SUMMARY fields
+    if summary:
+        table.add_row("─" * 20, "─" * 40)
+        for k, v in summary.items():
+            table.add_row(f"SUMMARY.{k}", v)
+
+    # Power fields
+    if power:
+        table.add_row("─" * 20, "─" * 40)
+        for k, v in power.items():
+            table.add_row(f"Power.{k}", v)
 
     console.print(table)
 
