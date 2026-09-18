@@ -1,0 +1,11 @@
+[project]
+name = "wmt"
+version = "0.1.0"
+description = "WhatsMiner 8889 protocol client - reverse-engineered from WhatsMinerTool 9.2.5"
+authors = [
+    { name = "Boran Car", email = "boran.car@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "pycryptodome>=3.23",
+]
