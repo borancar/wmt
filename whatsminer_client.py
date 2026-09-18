@@ -343,6 +343,50 @@ def info(ip: str = typer.Argument("10.3.1.128", help="Miner IP address")):
 
 
 @app.command()
+def compact(ip: str = typer.Argument("10.3.1.128", help="Miner IP address")):
+    """Show compact miner info (cmdcode 0x13)."""
+    console.print(f"[bold]Querying {ip}...[/bold]")
+    sid = get_session_id(ip)
+    if not sid:
+        console.print("[red]Auth failed[/red]")
+        raise typer.Exit(1)
+
+    text = get_compact_info(ip, sid)
+    if not text:
+        console.print("[red]Query failed[/red]")
+        raise typer.Exit(1)
+
+    # Parse the compact format: model-info#MAC#perms#SUMMARY,...|EDEVS,...|#Power,...
+    parts = text.split("#")
+    table = Table(title=f"Compact Info @ {ip}", show_lines=True)
+    table.add_column("Section", style="cyan")
+    table.add_column("Value")
+
+    if parts:
+        table.add_row("Model", parts[0].strip())
+    if len(parts) > 1:
+        table.add_row("MAC", parts[1].strip())
+
+    # Parse SUMMARY section
+    for part in parts:
+        if "SUMMARY" in part:
+            for item in part.split(","):
+                if "=" in item:
+                    k, _, v = item.partition("=")
+                    table.add_row(k.strip(), v.strip())
+
+    # Parse Power section
+    for part in parts:
+        if "Uptime=" in part:
+            for item in part.replace("#", "").split(","):
+                if "=" in item:
+                    k, _, v = item.partition("=")
+                    table.add_row(f"Power.{k.strip()}", v.strip())
+
+    console.print(table)
+
+
+@app.command()
 def hashrate(ip: str = typer.Argument("10.3.1.128", help="Miner IP address")):
     """Show hashrate information."""
     console.print(f"[bold]Querying {ip}...[/bold]")
