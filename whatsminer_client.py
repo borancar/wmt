@@ -207,6 +207,37 @@ def enable_api(ip: str, sid: str | None = None) -> bool:
     return send_remote_control(ip, "6=1", sid)
 
 
+def set_pools(ip: str, pools: list[dict], session_id: str | None = None) -> bool:
+    """Set pool configuration (cmdcode 0x02).
+
+    Each pool dict: {"url": str, "worker": str, "strategy": "FAILOVER", "password": str}
+    Up to 3 pools (index 0-2).
+    """
+    parts = []
+    for i, pool in enumerate(pools):
+        url = pool.get("url", "")
+        worker = pool.get("worker", "")
+        strategy = pool.get("strategy", "FAILOVER")
+        password = pool.get("password", "")
+        parts.append(f"{i},{url},{worker},{strategy},,{password}")
+    # Pad to 3 pools
+    for i in range(len(pools), 3):
+        parts.append(f"{i},,,FAILOVER,,")
+    param = "|".join(parts) + "|"
+
+    resp = query_cmd(ip, 0x02, session_id, param)
+    hdr = _parse_header(resp) if resp else None
+    return hdr is not None and hdr["cmdcode"] == 0x02
+
+
+def set_coin_type(ip: str, coin: str = "BTC/BCH/BSV",
+                  session_id: str | None = None) -> bool:
+    """Set coin type (cmdcode 0x06)."""
+    resp = query_cmd(ip, 0x06, session_id, coin)
+    hdr = _parse_header(resp) if resp else None
+    return hdr is not None and hdr["cmdcode"] == 0x06
+
+
 def query_4028(ip: str, command: str) -> dict | None:
     """Query via port 4028 JSON API."""
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -417,6 +448,50 @@ def enable_api_cmd(ip: str = typer.Argument("10.3.1.128", help="Miner IP address
     console.print(f"[bold]Enabling API on {ip}...[/bold]")
     if enable_api(ip):
         console.print("[green]API enabled successfully[/green]")
+    else:
+        console.print("[red]Failed[/red]")
+        raise typer.Exit(1)
+
+
+@app.command("set-pools")
+def set_pools_cmd(
+    ip: str = typer.Argument("10.3.1.128", help="Miner IP address"),
+    pool1: str = typer.Option("", "--pool1", help="Pool 1 URL (e.g. stratum+tcp://host:port)"),
+    worker1: str = typer.Option("", "--worker1", help="Pool 1 worker"),
+    password1: str = typer.Option("", "--password1", help="Pool 1 password"),
+    pool2: str = typer.Option("", "--pool2", help="Pool 2 URL"),
+    worker2: str = typer.Option("", "--worker2", help="Pool 2 worker"),
+    password2: str = typer.Option("", "--password2", help="Pool 2 password"),
+):
+    """Configure mining pools."""
+    pools = []
+    if pool1:
+        pools.append({"url": pool1, "worker": worker1, "password": password1})
+    if pool2:
+        pools.append({"url": pool2, "worker": worker2, "password": password2})
+    if not pools:
+        console.print("[red]At least one pool required (--pool1)[/red]")
+        raise typer.Exit(1)
+
+    console.print(f"[bold]Setting pools on {ip}...[/bold]")
+    for i, p in enumerate(pools):
+        console.print(f"  Pool {i}: {p['url']} / {p['worker']}")
+    if set_pools(ip, pools):
+        console.print("[green]Pools configured successfully[/green]")
+    else:
+        console.print("[red]Failed[/red]")
+        raise typer.Exit(1)
+
+
+@app.command("set-coin")
+def set_coin_cmd(
+    ip: str = typer.Argument("10.3.1.128", help="Miner IP address"),
+    coin: str = typer.Option("BTC/BCH/BSV", help="Coin type"),
+):
+    """Set coin type."""
+    console.print(f"[bold]Setting coin to {coin} on {ip}...[/bold]")
+    if set_coin_type(ip, coin):
+        console.print("[green]Coin type set successfully[/green]")
     else:
         console.print("[red]Failed[/red]")
         raise typer.Exit(1)
