@@ -398,10 +398,10 @@ def compact(ip: str = typer.Argument("10.50.3.95", help="Miner IP address")):
         if s.startswith("ASC="):
             fields = dict(item.split("=", 1) for item in s.split(",") if "=" in item)
             slot = fields.get("Slot", "?")
-            mhs = int(fields.get("MHS av", 0)) / 1_000_000
+            mhs = fields.get("MHS av", "0")
             freq = fields.get("Chip Frequency", "?")
             chips = fields.get("Effective Chips", "?")
-            table.add_row(f"Board {slot}", f"{mhs:.1f} MH/s, {freq} MHz, {chips} chips")
+            table.add_row(f"Board {slot}", f"{mhs} H/s, {freq} MHz, {chips} chips")
 
     # POOLS
     for s in sections:
@@ -463,12 +463,9 @@ def summary(ip: str = typer.Argument("10.50.3.95", help="Miner IP address")):
     table.add_column("Value")
 
     # Hashrate
-    hs_rt = int(data.get("HS RT", 0))
-    mhs_av = int(data.get("MHS av", 0))
-    mhs_15m = int(data.get("MHS 15m", 0))
-    table.add_row("Hashrate RT", f"{hs_rt / 1_000_000:.1f} MH/s ({hs_rt / 1_000_000_000:.2f} GH/s)")
-    table.add_row("Hashrate Avg", f"{mhs_av / 1_000_000:.1f} MH/s ({mhs_av / 1_000_000_000:.2f} GH/s)")
-    table.add_row("Hashrate 15m", f"{mhs_15m / 1_000_000:.1f} MH/s ({mhs_15m / 1_000_000_000:.2f} GH/s)")
+    table.add_row("HS RT", data.get("HS RT", "?"))
+    table.add_row("MHS av", data.get("MHS av", "?"))
+    table.add_row("MHS 15m", data.get("MHS 15m", "?"))
     table.add_row("Freq Avg", f"{data.get('freq_avg', '?')} MHz")
     table.add_row("Hash Stable", data.get("Hash Stable", "?"))
 
