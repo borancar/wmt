@@ -10,3 +10,10 @@ symbols.txt
 proxy.py
 whatsminer_peek.py
 whatsminer_test*.py
+api
+btminer
+btminer-api
+remote-daemon
+nandd
+profile
+rootfs/
