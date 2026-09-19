@@ -115,3 +115,28 @@ Lead for the new firmware: factory mode there is likely one of the unknown
 cmdcode 0x0D remote-control ops (the tool's Work Control dialog has
 "Allow Miner to Work" / "Disable Auto-Start Work" = op codes 7/9 still
 uncaptured).
+
+## New-firmware evolution of this surface (2025 M53S+ / 20250321.14.Rel)
+
+The 8889 responder role survives on current firmware (different binary, not
+available for RE), but the control surface was consolidated and gained a
+status-code system. Mapped live against 10.50.3.254 — full detail and the
+investigative trail in PROTOCOL.md ("CMD 0x0D" and "How this was found"):
+
+- 16-byte acks carry a result code: 0=executed, 3=unknown op, 4=invalid
+  value, 9=precondition failed. The old daemon's acks carried no such codes.
+- The 0x00–0x16 handler table shrank to a numeric N=V op space: 6=API
+  switch (enable gated on a password-change ritual, ack 9 until then —
+  the ritual is cmdcode 0x04 part2 `5,5,5,adminadminadmin`), 8=work control,
+  **10=SSH/dropbear toggle**, plus unknowns 7/12/13/19. Several ops execute
+  arbitrary values and one wiped pool config during the sweep — see the
+  warnings in PROTOCOL.md.
+- Old-firmware functions not present in the new op table: net config
+  (0x03), perms/SSH admin (0x04 repurposed as the password ritual), power
+  mode (0x05), reboot (0x08), pool strategy (0x0C), perm query (0x0E),
+  logs (0x14), upgrade status (0x15). Power-mode/reboot style actions are
+  presumably reachable through the multi-value ops (13/19?) or removed.
+- `web_pool` / `sshd` flags still reported in the compact perms section
+  (`web_pool=1,sshd=0`) — same fields the old daemon generated
+  (`file_exist("/tmp/dropbear_on")` at 0x405658); the new `10=1` op sets the
+  same dropbear state.

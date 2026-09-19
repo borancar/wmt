@@ -235,3 +235,95 @@ After [MinerInfo] section, separated by `#`:
 | Error Code Count | 2 | Total error count |
 | Factory Error Code 0 | 2110 | Factory error code |
 | Factory Error Code Count | 2 | Factory error count |
+
+---
+
+## CMD 0x0D: Remote Control (N=V) — ack codes, parser, op table
+
+Request: cmdcode=0x0D (Key2), part2 = `N=V` (appended directly after part1,
+no separator; len2 = 3 for single-digit pairs). Response is a 16-byte ack:
+```
+5a5a7f7f 0d000000 <code> 0000 ffff0000
+```
+The first halfword after the cmdcode is a **result code**, not data:
+
+| ack | meaning |
+|-----|---------|
+| 0 | op known, value parsed, **action executed** |
+| 1 | seen on ops 13, 19 with out-of-range values (meaning TBD) |
+| 3 | **unknown op** — nothing executed (safe probe response) |
+| 4 | known op, **invalid value** — nothing executed |
+| 9 | known op, valid value, **precondition failed** — nothing executed |
+
+### Value parser semantics (calibrated with malformed inputs)
+
+Both sides of the first `=` are parsed with atoi-like semantics:
+trailing junk ignored (`6=1x` → 1), whitespace skipped (` 6=1`, `6 =1` work),
+and **any value with no leading digits becomes 0 — which is in range for bool
+ops, so it executes as 0**. Consequently `6=on` / `6=enable` / `6=true` /
+`6==1` all parse to 0 and *disable* the API. There is no word form; "enable"
+is exactly `6=1`. Out-of-range numbers (`6=2`, `6=-1`, `6=999999`) and empty
+values (`6=`) return ack 4. Inputs without a recognizable op (`abc`, `=`)
+return ack 3.
+
+An ack of 0 therefore always means "something ran" — never probe unknown ops
+with plausible values; the ack-4 bool-op existence check (below) is the only
+side-effect-free discovery mechanism, and even that must not be followed by
+live-value guesses on ops that acked 0 with junk values.
+
+### Op table (M53S+, firmware 20250321.14.Rel)
+
+| op | type | function |
+|----|------|----------|
+| 6 | bool | API switch: 1 = enable write/command API on 4028, 0 = disable (reads always work). **Enable requires the password-change ritual first** (ack 9 otherwise) |
+| 7 | bool | executes; no observed effect on api/sshd/work — TBD |
+| 8 | bool | Work control: 0 = stop mining, 1 = resume |
+| 10 | bool | **SSH (dropbear)**: 1 = enable (perms `sshd=1`, port 22 opens), 0 = disable |
+| 12 | — | ack 4 on `=1`: not a plain bool (different arity/semantics), TBD |
+| 13, 19 | numeric | accept multi-value (ack 1 on V=2), semantics TBD |
+| 1,2,4,5,9,11,14,15,17,18,20,21,22 | — | **execute arbitrary values** (acked 0 with V=2; the wipe of pool config during the sweep came from this group) |
+| 0,3,16,23–30 | — | unknown op (ack 3) |
+
+### Enable-API password-change ritual (all firmwares)
+
+`6=1` returns ack 9 until a password change has been performed on the miner
+(even changing to the same password counts; miners can "forget" the flag,
+e.g. after reboots). Captured from WhatsMinerTool 9.2.5:
+
+1. `6=1` → ack 9 (precondition failed)
+2. **cmdcode 0x04** (Key2), part2 = `5,5,5,adminadminadmin` → ack 0
+3. `6=1` → ack 0 — API enabled (`MinerApiSwitch` becomes 1)
+
+The 0x04 payload marks the password as changed; the `super` login is
+unaffected (payload format is strict — `on`/`sshd=1` return ack 4).
+CLI: `change-password`, and `enable-api` runs the ritual automatically on
+ack 9.
+
+---
+
+## How this was found (investigative trail, 2026-09-19)
+
+1. **Ack codes discovered by calibration.** Valid commands returned ack 0,
+   but early `6=1` attempts on a miner whose flag was lost returned a
+   mysterious ack 9 while doing nothing. Only a live packet capture of the
+   tool GUI revealed why: the tool sent `6=1`, got ack 9, then sent a
+   **cmdcode 0x04** frame with part2 `5,5,5,adminadminadmin` (decrypted,
+   CRC-verified), retried `6=1` and got ack 0.
+2. **Parser semantics mapped with malformed inputs.** Sending `6=on`,
+   `6=enable`, `6=true`, `6=2`, `6=-1`, `6=`, `abc`, `=`, `6==1`, `6=1x`,
+   ` 6=1`, `6 =1` exposed the atoi behavior and the 0/3/4 code split.
+3. **Op existence sweep — and its lesson.** Probing `N=2` for N=0..30 was
+   intended as a safe "invalid value" scan: ops {6,7,8,10,12} acked 4 (known
+   bool ops), {13,19} acked 1, the rest of the space acked 3 (unknown) —
+   but **13 ops acked 0, meaning they executed foreign values**, and one of
+   them wiped the pool configuration (factory placeholder pool, btminer
+   restart). Restored immediately; the incident is why "ack 0 = executed"
+   is the first rule above.
+4. **Crossing with the SSH search.** Earlier `sshd=1`/`sshd=on` attempts had
+   acked 3 — with the parser known, that means "sshd" parses to op 0, i.e.
+   word-named ops are impossible; SSH had to be a numeric bool op. With
+   6=api and 8=work already known, candidates were 7/10/12. Testing `7=1`,
+   `10=1`, `12=1` individually (with pools/perms/port-22 verification after
+   each): `7=1` executed with no visible effect; **`10=1` flipped
+   `sshd=0→1` and opened port 22**; `12=1` acked 4. Dropbear on the miner
+   offers legacy ssh-rsa only.
