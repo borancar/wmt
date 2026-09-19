@@ -80,3 +80,38 @@ single key for all cmdcodes; the Key2/Key3 split seen in the tool came later.
 
 On the old firmware, `api` (4028 JSON) and `remote-daemon` (8889 binary) run side
 by side; the tool's "API disable" op only affects the 4028 side, same as now.
+
+## Factory mode & SSH gating (from /etc/profile, confirmed in binary)
+
+`/etc/profile` gates interactive shells at login:
+
+```sh
+if [ ! -f /tmp/dropbear_on ]; then exit; fi                  # SSH master switch
+if [ ! -f /tmp/factory_mode ] && [ "$USER" = "admin" ]; then exit; fi
+```
+
+So: SSH (dropbear) runs only when `/tmp/dropbear_on` exists, and the **admin**
+user specifically gets no shell unless `/tmp/factory_mode` also exists — factory
+mode is exactly the "allow admin SSH sessions" switch. Other users (root) are
+not blocked by the second check.
+
+Attribution in `remote-daemon` (the 4028 `api` daemon has none of these strings):
+
+- `/tmp/dropbear_on` + `/etc/init.d/dropbear start &` / `stop &` + log
+  `turn ssh %s by %s` → SSH on/off, reachable via 8889 (cmdcode 0x04 family).
+  The `sshd=%d` status reported in the compact perms string (`web_pool=1,sshd=0`)
+  is `file_exist("/tmp/dropbear_on")` at 0x405658 — same field the new
+  firmware still reports.
+- `/tmp/factory_mode` → cmdcode **0x0D** handler (0x4048d0): `is_factory_mode()`
+  → `set_factory_mode()` → "setting factory mode" / "Restart btminer as %s", and
+  cmdcode 0x00 runs `/usr/bin/factory-mode-commands &` (just `write-hash-rate`,
+  records hash rate into EEPROM for factory test).
+- cmdcode **0x04** handler (0x4051b0): admin/permissions management — reads
+  `/etc/shadow` + `/etc/config/permissions`, restores default admin password
+  ("Password of user 'admin' was restored to default value, disable miner api
+  switch and restart api service").
+
+Lead for the new firmware: factory mode there is likely one of the unknown
+cmdcode 0x0D remote-control ops (the tool's Work Control dialog has
+"Allow Miner to Work" / "Disable Auto-Start Work" = op codes 7/9 still
+uncaptured).
