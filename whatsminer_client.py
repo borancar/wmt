@@ -32,7 +32,7 @@ KEY_QUERY = bytes.fromhex(
 )
 
 # Cmdcodes that modify miner state — never send these with empty/guessed params
-WRITE_CMDCODES = {0x02, 0x06, 0x0D}
+WRITE_CMDCODES = {0x02, 0x04, 0x06, 0x0D}
 
 # Known safe read-only cmdcodes
 READ_CMDCODES = {0x11, 0x13, 0x16}
@@ -225,8 +225,51 @@ def disable_api(ip: str, sid: str | None = None) -> bool:
     return send_remote_control(ip, "6=0", sid)
 
 
-def enable_api(ip: str, sid: str | None = None) -> bool:
-    return send_remote_control(ip, "6=1", sid)
+def change_password(ip: str, param: str = "5,5,5,adminadminadmin",
+                    sid: str | None = None) -> tuple[bool, int]:
+    """Password-change ritual (cmdcode 0x04).
+
+    Payload captured from WhatsMinerTool 9.2.5 (2026-09-19): part2 =
+    "5,5,5,adminadminadmin". Performing this marks the password as changed on
+    the miner, which is a precondition for enabling the write API (6=1).
+    Sending the same values is fine — the login password is unaffected.
+    Returns (success, ack_code).
+    """
+    resp = query_cmd(ip, 0x04, sid, param)
+    hdr = _parse_header(resp) if resp else None
+    if hdr is None or hdr["cmdcode"] != 0x04:
+        return False, -1
+    return True, hdr["len1"]
+
+
+def enable_api(ip: str, sid: str | None = None) -> tuple[bool, str]:
+    """Enable the write/command API on port 4028 (0x0D "6=1").
+
+    All firmwares require a password change before the API can be enabled
+    (even changing to the same password counts). If the first 6=1 is rejected
+    (ack code 9 = precondition not met), run the 0x04 password-change ritual
+    and retry. Returns (success, detail).
+    """
+    ok, code = _enable_api_once(ip, sid)
+    if ok and code == 0:
+        return True, "API enabled"
+    if ok and code == 9:
+        pw_ok, pw_code = change_password(ip, sid=sid)
+        if not pw_ok:
+            return False, f"6=1 rejected (code 9), password-change ritual failed (ack {pw_code})"
+        ok, code = _enable_api_once(ip, sid)
+        if ok and code == 0:
+            return True, "API enabled after password-change ritual"
+        return False, f"password-change ritual done (ack {pw_code}), but 6=1 still returns code {code}"
+    return False, f"6=1 returned ack code {code}"
+
+
+def _enable_api_once(ip: str, sid: str | None = None) -> tuple[bool, int]:
+    resp = query_cmd(ip, 0x0D, sid, "6=1")
+    hdr = _parse_header(resp) if resp else None
+    if hdr is None or hdr["cmdcode"] != 0x0D:
+        return False, -1
+    return True, hdr["len1"]
 
 
 def set_pools(ip: str, pools: list[dict], session_id: str | None = None) -> bool:
@@ -665,12 +708,33 @@ def disable_api_cmd(ip: str = typer.Argument("10.50.3.254", help="Miner IP addre
 
 @app.command("enable-api")
 def enable_api_cmd(ip: str = typer.Argument("10.50.3.254", help="Miner IP address")):
-    """Enable API on port 4028."""
+    """Enable write/command API on port 4028 (auto-runs password-change ritual if required)."""
     console.print(f"[bold]Enabling API on {ip}...[/bold]")
-    if enable_api(ip):
-        console.print("[green]API enabled successfully[/green]")
+    ok, detail = enable_api(ip)
+    if ok:
+        console.print(f"[green]{detail}[/green]")
     else:
-        console.print("[red]Failed[/red]")
+        console.print(f"[red]{detail}[/red]")
+        raise typer.Exit(1)
+
+
+@app.command("change-password")
+def change_password_cmd(
+    ip: str = typer.Argument("10.50.3.254", help="Miner IP address"),
+    param: str = typer.Option("5,5,5,adminadminadmin", "--param", "-p",
+                              help="0x04 payload (captured default; same-password is fine)"),
+):
+    """Run the password-change ritual (cmdcode 0x04).
+
+    Marks the password as changed on the miner — required before enable-api
+    will succeed. Uses the exact payload captured from WhatsMinerTool.
+    """
+    console.print(f"[bold]Running password-change ritual on {ip}...[/bold]")
+    ok, code = change_password(ip, param)
+    if ok:
+        console.print(f"[green]Done (ack code {code})[/green]")
+    else:
+        console.print(f"[red]Failed (ack code {code})[/red]")
         raise typer.Exit(1)
 
 
