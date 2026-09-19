@@ -324,7 +324,7 @@ def _parse_miner_info(text: str) -> dict:
 # ── CLI commands ─────────────────────────────────────────────────────
 
 @app.command()
-def info(ip: str = typer.Argument("10.50.3.95", help="Miner IP address")):
+def info(ip: str = typer.Argument("10.50.3.254", help="Miner IP address")):
     """Show full miner information."""
     console.print(f"[bold]Querying {ip}...[/bold]")
     sid = get_session_id(ip)
@@ -365,7 +365,7 @@ def info(ip: str = typer.Argument("10.50.3.95", help="Miner IP address")):
 
 
 @app.command()
-def compact(ip: str = typer.Argument("10.50.3.95", help="Miner IP address")):
+def compact(ip: str = typer.Argument("10.50.3.254", help="Miner IP address")):
     """Show compact miner info (cmdcode 0x13)."""
     console.print(f"[bold]Querying {ip}...[/bold]")
     sid = get_session_id(ip)
@@ -467,7 +467,7 @@ def _get_summary_dict(ip: str, sid: str | None = None) -> dict | None:
 
 
 @app.command()
-def summary(ip: str = typer.Argument("10.50.3.95", help="Miner IP address")):
+def summary(ip: str = typer.Argument("10.50.3.254", help="Miner IP address")):
     """Show mining summary (hashrate, power, temps)."""
     console.print(f"[bold]Querying {ip}...[/bold]")
     sid = get_session_id(ip)
@@ -518,7 +518,7 @@ def summary(ip: str = typer.Argument("10.50.3.95", help="Miner IP address")):
 
 
 @app.command()
-def hashrate(ip: str = typer.Argument("10.50.3.95", help="Miner IP address")):
+def hashrate(ip: str = typer.Argument("10.50.3.254", help="Miner IP address")):
     """Show hashrate information."""
     console.print(f"[bold]Querying {ip}...[/bold]")
     sid = get_session_id(ip)
@@ -559,7 +559,7 @@ def hashrate(ip: str = typer.Argument("10.50.3.95", help="Miner IP address")):
 
 
 @app.command()
-def power(ip: str = typer.Argument("10.50.3.95", help="Miner IP address")):
+def power(ip: str = typer.Argument("10.50.3.254", help="Miner IP address")):
     """Show power supply realtime info (cmdcode 0x1A)."""
     console.print(f"[bold]Querying {ip}...[/bold]")
     sid = get_session_id(ip)
@@ -590,7 +590,7 @@ def power(ip: str = typer.Argument("10.50.3.95", help="Miner IP address")):
 
 
 @app.command()
-def pools(ip: str = typer.Argument("10.50.3.95", help="Miner IP address")):
+def pools(ip: str = typer.Argument("10.50.3.254", help="Miner IP address")):
     """Show pool configuration."""
     console.print(f"[bold]Querying {ip}...[/bold]")
     sid = get_session_id(ip)
@@ -631,7 +631,7 @@ def pools(ip: str = typer.Argument("10.50.3.95", help="Miner IP address")):
 
 
 @app.command()
-def resume(ip: str = typer.Argument("10.50.3.95", help="Miner IP address")):
+def resume(ip: str = typer.Argument("10.50.3.254", help="Miner IP address")):
     """Resume mining."""
     console.print(f"[bold]Resuming {ip}...[/bold]")
     if resume_work(ip):
@@ -642,7 +642,7 @@ def resume(ip: str = typer.Argument("10.50.3.95", help="Miner IP address")):
 
 
 @app.command()
-def stop(ip: str = typer.Argument("10.50.3.95", help="Miner IP address")):
+def stop(ip: str = typer.Argument("10.50.3.254", help="Miner IP address")):
     """Stop mining."""
     console.print(f"[bold]Stopping {ip}...[/bold]")
     if stop_work(ip):
@@ -653,7 +653,7 @@ def stop(ip: str = typer.Argument("10.50.3.95", help="Miner IP address")):
 
 
 @app.command("disable-api")
-def disable_api_cmd(ip: str = typer.Argument("10.50.3.95", help="Miner IP address")):
+def disable_api_cmd(ip: str = typer.Argument("10.50.3.254", help="Miner IP address")):
     """Disable API on port 4028."""
     console.print(f"[bold]Disabling API on {ip}...[/bold]")
     if disable_api(ip):
@@ -664,7 +664,7 @@ def disable_api_cmd(ip: str = typer.Argument("10.50.3.95", help="Miner IP addres
 
 
 @app.command("enable-api")
-def enable_api_cmd(ip: str = typer.Argument("10.50.3.95", help="Miner IP address")):
+def enable_api_cmd(ip: str = typer.Argument("10.50.3.254", help="Miner IP address")):
     """Enable API on port 4028."""
     console.print(f"[bold]Enabling API on {ip}...[/bold]")
     if enable_api(ip):
@@ -676,7 +676,7 @@ def enable_api_cmd(ip: str = typer.Argument("10.50.3.95", help="Miner IP address
 
 @app.command("set-pools")
 def set_pools_cmd(
-    ip: str = typer.Argument("10.50.3.95", help="Miner IP address"),
+    ip: str = typer.Argument("10.50.3.254", help="Miner IP address"),
     pool1: str = typer.Option("", "--pool1", help="Pool 1 URL (e.g. stratum+tcp://host:port)"),
     worker1: str = typer.Option("", "--worker1", help="Pool 1 worker"),
     password1: str = typer.Option("", "--password1", help="Pool 1 password"),
@@ -711,7 +711,7 @@ def set_pools_cmd(
 
 @app.command("set-coin")
 def set_coin_cmd(
-    ip: str = typer.Argument("10.50.3.95", help="Miner IP address"),
+    ip: str = typer.Argument("10.50.3.254", help="Miner IP address"),
     coin: str = typer.Option("BTC/BCH/BSV", help="Coin type"),
 ):
     """Set coin type."""
@@ -724,7 +724,7 @@ def set_coin_cmd(
 
 
 @app.command()
-def raw(ip: str = typer.Argument("10.50.3.95", help="Miner IP address"),
+def raw(ip: str = typer.Argument("10.50.3.254", help="Miner IP address"),
         cmdcode: int = typer.Option(0x16, "--cmd", "-c", help="Command code (hex)"),
         param: str = typer.Option("", "--param", "-p", help="Parameter (N=V format)"),
         force: bool = typer.Option(False, "--force", "-f", help="Allow write cmdcodes")):
