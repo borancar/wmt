@@ -599,20 +599,35 @@ def pools(ip: str = typer.Argument("10.50.3.95", help="Miner IP address")):
         raise typer.Exit(1)
 
     data = get_miner_info(ip, sid)
-    if not data:
+    compact = get_compact_info(ip, sid)
+    if not data or not compact:
         console.print("[red]Query failed[/red]")
         raise typer.Exit(1)
 
     raw = data["_raw"]
+    web_pool = raw.get("web_pool", "")
+    if not web_pool:
+        # MinerInfo embeds the compact string; the flag shows up as "#web_pool"
+        web_pool = raw.get("#web_pool", "").split(",")[0]
     table = Table(title=f"Pools @ {ip}", show_lines=True)
     table.add_column("Field", style="cyan")
     table.add_column("Value")
     table.add_row("Pool Strategy", raw.get("PoolStrategy", ""))
     table.add_row("Coin Type", raw.get("CoinType", ""))
-    table.add_row("Web Pool", raw.get("web_pool", ""))
+    table.add_row("Web Pool", web_pool)
     table.add_row("API Switch", raw.get("MinerApiSwitch", ""))
+
+    main = next((p for p in compact.split("#") if "POOL=" in p), "")
+    for s in main.split("|"):
+        if s.startswith("POOL="):
+            fields = dict(item.split("=", 1) for item in s.split(",") if "=" in item)
+            pool_id = fields.get("POOL", "?")
+            url = fields.get("URL", "")
+            user = fields.get("User", "")
+            active = fields.get("Stratum Active", "")
+            table.add_row(f"Pool {pool_id}", f"{url} / {user} (active={active})")
+
     console.print(table)
-    console.print("[dim]Note: Pool URLs require a separate query (not yet implemented)[/dim]")
 
 
 @app.command()
