@@ -225,6 +225,16 @@ def disable_api(ip: str, sid: str | None = None) -> bool:
     return send_remote_control(ip, "6=0", sid)
 
 
+def enable_ssh(ip: str, sid: str | None = None) -> bool:
+    """Enable SSH (dropbear) on the miner (cmdcode 0x0D, op 10)."""
+    return send_remote_control(ip, "10=1", sid)
+
+
+def disable_ssh(ip: str, sid: str | None = None) -> bool:
+    """Disable SSH (dropbear) on the miner (cmdcode 0x0D, op 10)."""
+    return send_remote_control(ip, "10=0", sid)
+
+
 def change_password(ip: str, param: str = "5,5,5,adminadminadmin",
                     sid: str | None = None) -> tuple[bool, int]:
     """Password-change ritual (cmdcode 0x04).
@@ -701,6 +711,30 @@ def disable_api_cmd(ip: str = typer.Argument("10.50.3.254", help="Miner IP addre
     console.print(f"[bold]Disabling API on {ip}...[/bold]")
     if disable_api(ip):
         console.print("[green]API disabled successfully[/green]")
+    else:
+        console.print("[red]Failed[/red]")
+        raise typer.Exit(1)
+
+
+@app.command("enable-ssh")
+def enable_ssh_cmd(ip: str = typer.Argument("10.50.3.254", help="Miner IP address")):
+    """Enable SSH (dropbear) on the miner. Verify with: perms sshd=1 / port 22."""
+    console.print(f"[bold]Enabling SSH on {ip}...[/bold]")
+    if enable_ssh(ip):
+        console.print("[green]SSH enable command accepted (op 10=1)[/green]")
+        console.print("[dim]Verify: compact perms should show sshd=1, port 22 open.[/dim]")
+        console.print("[dim]Note: dropbear offers legacy ssh-rsa only — use legacy kex/ciphers to connect.[/dim]")
+    else:
+        console.print("[red]Failed[/red]")
+        raise typer.Exit(1)
+
+
+@app.command("disable-ssh")
+def disable_ssh_cmd(ip: str = typer.Argument("10.50.3.254", help="Miner IP address")):
+    """Disable SSH (dropbear) on the miner."""
+    console.print(f"[bold]Disabling SSH on {ip}...[/bold]")
+    if disable_ssh(ip):
+        console.print("[green]SSH disable command accepted (op 10=0)[/green]")
     else:
         console.print("[red]Failed[/red]")
         raise typer.Exit(1)
